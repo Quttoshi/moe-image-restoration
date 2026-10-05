@@ -1,4 +1,4 @@
-# 21i2525-A1 — Generative AI Assignment 1
+# 21i2525-A1 - Generative AI Assignment 1
 
 Four related generative systems, from data pipeline to a containerised web application:
 
