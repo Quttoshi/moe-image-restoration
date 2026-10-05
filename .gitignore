@@ -1,0 +1,40 @@
+# Python / uv
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Data and large artefacts (documented download instead)
+data/raw/
+data/processed/
+checkpoints/
+mlruns/
+mlartifacts/
+outputs/
+*.pt
+*.pth
+
+# ONNX models are tracked with Git LFS (see .gitattributes).
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# LaTeX build
+report/*.aux
+report/*.log
+report/*.out
+report/*.bbl
+report/*.blg
+report/*.synctex.gz
+
+# Assignment brief
+GenAI_Assignment#1.pdf
+.tools/
+21i2525_GenAI_A1_Report.pdf

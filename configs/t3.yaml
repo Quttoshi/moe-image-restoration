@@ -1,0 +1,29 @@
+# Task 3 - Jointly trained soft mixture-of-experts
+experiment: t3_soft_moe
+study_name: t3_moe
+
+search_space:
+  lr_joint: {type: float, low: 1.0e-5, high: 3.0e-4, log: true}
+  tau: {type: float, low: 0.3, high: 3.0, log: true}
+  lam_c: {type: float, low: 0.0, high: 0.5}
+  lam_b: {type: float, low: 1.0e-4, high: 0.1, log: true}
+  lam_1: {type: float, low: 0.5, high: 0.95}     # lam_s = 1 - lam_1
+
+fixed:
+  batch_size: 16          # 3 experts + gate in memory on a 4 GB GPU
+  lr_gate: 5.0e-4         # warm-up learning rate (experts frozen)
+  warmup_epochs: 1
+  weight_decay: 1.0e-5
+  collapse_threshold: 0.02  # prune trial if any branch's mean val weight falls below this
+
+tune:
+  n_trials: 4          # reduced: deadline
+  joint_epochs: 2
+  pruner: {n_startup_trials: 4, n_warmup_steps: 1}
+
+train:
+  joint_epochs: 6      # reduced: deadline
+  patience: 4
+
+# Starting point from the brief
+defaults: {lr_joint: 1.0e-4, tau: 1.0, lam_c: 0.1, lam_b: 0.01, lam_1: 0.8}

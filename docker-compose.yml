@@ -1,0 +1,26 @@
+# One-command start:  docker compose up --build
+# Then open http://localhost:3000   (API docs: http://localhost:8000/docs)
+# Requires the ONNX models in ./models (see README - scripts/download_models).
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: 21i2525-a1-backend
+    volumes:
+      - ./models:/models:ro
+    environment:
+      ORT_THREADS: "4"
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    image: 21i2525-a1-frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+    restart: unless-stopped

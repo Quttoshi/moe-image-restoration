@@ -1,0 +1,46 @@
+[project]
+name = "genai-a1"
+version = "0.1.0"
+description = "21i2525 - GenAI Assignment 1: multi-corruption restoration (UDAE, hard routing, soft MoE) and style-conditioned face-to-sketch cGAN"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "torch>=2.7",
+    "torchvision>=0.22",
+    "optuna>=4.0",
+    "mlflow>=2.17",
+    "onnx>=1.17",
+    "onnxruntime>=1.20",
+    "pytorch-msssim>=1.0",
+    "scikit-learn>=1.5",
+    "matplotlib>=3.9",
+    "seaborn>=0.13",
+    "pandas>=2.2",
+    "pyyaml>=6.0",
+    "pillow>=10.4",
+    "numpy>=1.26",
+    "tqdm>=4.66",
+    "gdown>=5.2",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=8.3",
+    "python-multipart>=0.0.32",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu128" }]
+torchvision = [{ index = "pytorch-cu128" }]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

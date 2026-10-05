@@ -1,0 +1,33 @@
+# Task 1 - Universal Multi-Corruption Denoising Autoencoder
+experiment: t1_universal_dae
+study_name: t1_udae
+
+search_space:
+  lr: {type: float, low: 1.0e-4, high: 3.0e-3, log: true}
+  batch_size: {type: categorical, choices: [16, 32, 64]}
+  latent_res: {type: categorical, choices: [8, 16]}          # spatial size of the latent
+  latent_ch: {type: categorical, choices: [4, 8, 16, 32]}    # bottleneck dim = latent_ch * latent_res^2 (256 .. 8192)
+  base_ch: {type: categorical, choices: [16, 32, 48]}        # encoder channels c, 2c, 4c, 8c
+  dropout: {type: float, low: 0.0, high: 0.3}
+  alpha: {type: float, low: 0.5, high: 0.95}                 # L = a*L1 + (1-a)*(1-SSIM)
+
+tune:
+  n_trials: 30
+  epochs: 10
+  pruner: {n_startup_trials: 5, n_warmup_steps: 3}
+
+train:
+  epochs: 60
+  patience: 12
+  skip_levels: 0         # 0 = pure bottleneck; ablation runs use 1 and 2
+  weight_decay: 1.0e-5
+
+# Used if no Optuna study exists yet (initial guess from the brief: alpha = 0.8)
+defaults:
+  lr: 1.0e-3
+  batch_size: 32
+  latent_res: 16
+  latent_ch: 8
+  base_ch: 32
+  dropout: 0.1
+  alpha: 0.8

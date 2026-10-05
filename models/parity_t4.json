@@ -1,0 +1,15 @@
+[
+ {
+  "model": "t4_generator.onnx",
+  "batch": 3,
+  "ort_ms": 24.33,
+  "outputs": {
+   "sketch": {
+    "max_abs_diff": 2.000480890274048e-06,
+    "mean_abs_diff": 1.3223872485923494e-07
+   }
+  },
+  "passed": true,
+  "atol": 0.0001
+ }
+]

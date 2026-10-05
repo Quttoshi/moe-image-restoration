@@ -1,0 +1,54 @@
+[
+ {
+  "model": "t2_classifier.onnx",
+  "batch": 4,
+  "ort_ms": 39.36,
+  "outputs": {
+   "logits": {
+    "max_abs_diff": 3.337860107421875e-06,
+    "mean_abs_diff": 1.1497177183628082e-06
+   }
+  },
+  "passed": true,
+  "atol": 0.0001
+ },
+ {
+  "model": "t2_specialist_salt_pepper.onnx",
+  "batch": 4,
+  "ort_ms": 33.43,
+  "outputs": {
+   "restored": {
+    "max_abs_diff": 2.384185791015625e-06,
+    "mean_abs_diff": 6.787067974300953e-08
+   }
+  },
+  "passed": true,
+  "atol": 0.0001
+ },
+ {
+  "model": "t2_specialist_blur.onnx",
+  "batch": 4,
+  "ort_ms": 16.46,
+  "outputs": {
+   "restored": {
+    "max_abs_diff": 2.384185791015625e-06,
+    "mean_abs_diff": 9.00394709901775e-08
+   }
+  },
+  "passed": true,
+  "atol": 0.0001
+ },
+ {
+  "model": "t2_specialist_occlusion.onnx",
+  "batch": 4,
+  "ort_ms": 16.74,
+  "outputs": {
+   "restored": {
+    "max_abs_diff": 2.8759241104125977e-06,
+    "mean_abs_diff": 1.565831695415909e-07
+   }
+  },
+  "passed": true,
+  "atol": 0.0001
+ }
+]

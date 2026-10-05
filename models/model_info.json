@@ -1,0 +1,90 @@
+{
+ "t1_universal_dae": {
+  "file": "t1_universal_dae.onnx",
+  "config": {
+   "base_ch": 32,
+   "latent_ch": 32,
+   "dropout": 0.0787593365784246,
+   "skip_levels": 0,
+   "latent_res": 16
+  },
+  "latent_dim": 8192
+ },
+ "t2_classifier": {
+  "file": "t2_classifier.onnx",
+  "classes": [
+   "clean",
+   "salt_pepper",
+   "blur",
+   "occlusion"
+  ],
+  "config": {
+   "channels": [
+    32,
+    64,
+    128,
+    256
+   ],
+   "dropout": 0.06870208188845103,
+   "n_classes": 4
+  }
+ },
+ "t2_specialist_salt_pepper": {
+  "file": "t2_specialist_salt_pepper.onnx",
+  "config": {
+   "base_ch": 32,
+   "latent_ch": 32,
+   "dropout": 0.05,
+   "skip_levels": 0,
+   "latent_res": 16
+  }
+ },
+ "t2_specialist_blur": {
+  "file": "t2_specialist_blur.onnx",
+  "config": {
+   "base_ch": 32,
+   "latent_ch": 32,
+   "dropout": 0.05,
+   "skip_levels": 0,
+   "latent_res": 16
+  }
+ },
+ "t2_specialist_occlusion": {
+  "file": "t2_specialist_occlusion.onnx",
+  "config": {
+   "base_ch": 32,
+   "latent_ch": 32,
+   "dropout": 0.05,
+   "skip_levels": 0,
+   "latent_res": 16
+  }
+ },
+ "t3_soft_moe": {
+  "file": "t3_soft_moe.onnx",
+  "branches": [
+   "identity",
+   "salt_pepper",
+   "blur",
+   "occlusion"
+  ],
+  "tau": 0.34292951226234436
+ },
+ "t4_generator": {
+  "file": "t4_generator.onnx",
+  "styles": [
+   "Style 1",
+   "Style 2",
+   "Style 3"
+  ],
+  "input_range": [
+   -1,
+   1
+  ],
+  "config": {
+   "base_ch": 48,
+   "emb_dim": 16,
+   "dropout": 0.15230688458668534,
+   "n_styles": 3
+  }
+ }
+}

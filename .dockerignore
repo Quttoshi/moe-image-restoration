@@ -1,0 +1,13 @@
+.venv
+**/.venv
+data
+checkpoints
+mlruns
+outputs
+models
+optuna_studies
+report
+frontend/node_modules
+frontend/dist
+.git
+*.pdf

@@ -1,0 +1,28 @@
+[
+ {
+  "model": "t1_universal_dae.onnx",
+  "batch": 4,
+  "ort_ms": 17.65,
+  "outputs": {
+   "restored": {
+    "max_abs_diff": 3.427267074584961e-06,
+    "mean_abs_diff": 1.4842754580968176e-07
+   }
+  },
+  "passed": true,
+  "atol": 0.0001
+ },
+ {
+  "model": "t1_universal_dae.onnx",
+  "batch": 2,
+  "ort_ms": 11.45,
+  "outputs": {
+   "restored": {
+    "max_abs_diff": 3.635883331298828e-06,
+    "mean_abs_diff": 3.6664701497102214e-07
+   }
+  },
+  "passed": true,
+  "atol": 0.0001
+ }
+]

@@ -1,0 +1,23 @@
+[
+ {
+  "model": "t3_soft_moe.onnx",
+  "batch": 4,
+  "ort_ms": 56.87,
+  "outputs": {
+   "restored": {
+    "max_abs_diff": 3.725290298461914e-06,
+    "mean_abs_diff": 1.2737272925278376e-07
+   },
+   "weights": {
+    "max_abs_diff": 4.94765117764473e-10,
+    "mean_abs_diff": 3.117258881579765e-11
+   },
+   "logits": {
+    "max_abs_diff": 3.337860107421875e-06,
+    "mean_abs_diff": 7.394701242446899e-07
+   }
+  },
+  "passed": true,
+  "atol": 0.0001
+ }
+]
