@@ -1,4 +1,4 @@
-\documentclass[conference]{IEEEtran}
+﻿\documentclass[conference]{IEEEtran}
 \IEEEoverridecommandlockouts
 \usepackage{cite}
 \usepackage{amsmath,amssymb,amsfonts}
@@ -12,7 +12,7 @@
 \usepackage{url}
 \graphicspath{{figures/}{../outputs/}}
 
-\newcommand{\repo}{\url{https://github.com/Quttoshi/21i2525-A1}}
+\newcommand{\repo}{\url{https://github.com/Quttoshi/moe-image-restoration}}
 \newcommand{\video}{\url{https://youtu.be/VIDEO_ID}}
 \newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
 
@@ -154,6 +154,19 @@ balanced (184 per condition). The test manifest holds clean plus three levels of
 every test image, i.e.\ $3{,}669\times10 = 36{,}690$ cases. Replaying an entry reproduces the corrupted
 image bit-exactly. Our blur matches \texttt{torchvision} to $<10^{-5}$.
 
+\textbf{Split integrity.} The file names of the 2,944 training, 736 validation and 3,669 test images
+are stored in \texttt{data/processed/pets\_split.json}. The three sets are pairwise disjoint, which is
+verified by set intersection (all empty), and the same file is reused by Tasks~1--3.
+Fig.~\ref{fig:corr} shows the deterministic test conditions for three test images.
+
+\begin{figure*}[t]\centering
+\includegraphics[width=0.95\textwidth]{corruptions.png}
+\caption{Every test condition from the deterministic manifest for three test images. Columns:
+clean; salt-and-pepper $p=0.03/0.08/0.15$; Gaussian blur $(3,0.7)/(5,1.5)/(7,2.5)$; occlusion with
+1/2/3 rectangles covering about 10/20/35\%.}
+\label{fig:corr}
+\end{figure*}
+
 %=====================================================================
 \section{Task 1: Universal Denoising Autoencoder}\label{sec:t1}
 %=====================================================================
@@ -167,6 +180,10 @@ a fully connected vector because it keeps object layout while still forcing a la
 $r\in\{8,16\}$ and $C_z\in\{4,\dots,32\}$ the latent holds 256--8,192 values, against 49,152 input
 values (6$\times$--192$\times$ compression). A preliminary run showed the $8\times8$ latent saturating
 near 20\,dB, so the latent resolution became an Optuna variable rather than a fixed choice.
+\textbf{Summary of the selected model}: $c=32$, three stride-2 stages ($128\to64\to32\to16$, channels
+32/64/128), latent $z\in\mathbb{R}^{32\times16\times16}$ (8,192 values, a 6$\times$ compression),
+\textbf{496,099 learnable parameters}. The model receives only the corrupted image, never the
+corruption label.
 
 \begin{figure}[t]
 \centering
@@ -307,7 +324,14 @@ pooling before stride, because salt-and-pepper noise and blur are high-frequency
 pooling would average away. The head concatenates global \emph{average} and global \emph{max} pooling:
 max pooling responds to sparse saturated pixels (S\&P) and to large flat black regions (occlusion).
 Training uses cross-entropy on the balanced runtime batches. Optuna tuned learning rate, batch size,
-channel configuration, dropout and weight decay, maximising validation macro-F1.
+channel configuration (\{16-32-64-128, 32-64-128-256, 32-64-128-128, 48-96-192-384\}), dropout
+$[0,0.5]$ and weight decay $[10^{-6},10^{-2}]$ (log), maximising validation macro-F1
+(Fig.~\ref{fig:optclf}). The selected classifier has \textbf{1,239,396 parameters}.
+
+\begin{figure}[t]\centering
+\includegraphics[width=\columnwidth]{optuna_t2_classifier.png}
+\caption{Classifier Optuna study (25 trials; 12 completed, 13 pruned).}\label{fig:optclf}
+\end{figure}
 
 \subsection{Specialists}
 Three autoencoders with the Task~1 architecture are trained independently, each only on its own
@@ -327,7 +351,18 @@ warm-started with the Task~1 configuration. Its best trial (the warm start, 32-c
 retrained with this configuration (20 epochs each, compute-limited). Validation PSNR/SSIM improved from
 24.3/0.74, 24.3/0.73 and 20.7/0.65 to \textbf{26.1/0.82, 25.9/0.81 and 21.3/0.71} for S\&P, blur and
 occlusion. The evidence from the second study therefore fixed a 1.5--2\,dB deficit that the first study
-had introduced.
+had introduced. Each specialist uses the same architecture as Task~1 ($c=32$, 8,192-value latent,
+\textbf{496,099 parameters each}, 1.49\,M in total) with independently trained weights. Its training
+curves are shown in Fig.~\ref{fig:speccurves}, and its per-severity test performance is the oracle
+column of Table~\ref{tab:t2sev}.
+
+\begin{figure}[t]\centering
+\includegraphics[width=\columnwidth]{t2_spec_sp_curves.png}\\
+\includegraphics[width=\columnwidth]{t2_spec_blur_curves.png}\\
+\includegraphics[width=\columnwidth]{t2_spec_occ_curves.png}
+\caption{Training loss and validation PSNR of the S\&P (top), blur (middle) and occlusion (bottom)
+specialists.}\label{fig:speccurves}
+\end{figure}
 
 \begin{figure}[t]\centering
 \includegraphics[width=\columnwidth]{optuna_t2_specialists.png}\\
@@ -393,6 +428,31 @@ corrupted inputs Task~2 is slightly \emph{below} Task~1 (24.3 vs.\ 24.6\,dB). Si
 identical, this is not a routing problem. The specialists simply received 20 training epochs against
 Task~1's 60, which shows that a hard-routed system is only as good as its experts.
 
+\begin{table}[t]\centering
+\caption{Task 2 hard routing by corruption and severity: oracle (true label selects the expert, i.e.\
+per-specialist performance) vs.\ predicted (classifier selects). PSNR\,dB / SSIM; last column =
+fraction of misrouted images.}\label{tab:t2sev}\footnotesize
+\begin{tabular}{@{}llccr@{}}\toprule
+Condition & Sev. & Oracle & Predicted & Misr.\\\midrule
+Clean & -- & $\infty$ / 1.000 & 98.8 / 0.997 & 1.55\%\\
+S\&P & L & 25.98 / 0.828 & 25.98 / 0.828 & 0\%\\
+ & M & 25.92 / 0.826 & 25.92 / 0.826 & 0\%\\
+ & H & 25.77 / 0.819 & 25.77 / 0.819 & 0\%\\
+Blur & L & 25.76 / 0.824 & 25.76 / 0.824 & 0.11\%\\
+ & M & 25.91 / 0.819 & 25.91 / 0.819 & 0\%\\
+ & H & 24.66 / 0.745 & 24.66 / 0.745 & 0\%\\
+Occlusion & L & 23.18 / 0.767 & 23.19 / 0.767 & 0.14\%\\
+ & M & 21.66 / 0.721 & 21.66 / 0.721 & 0\%\\
+ & H & 19.92 / 0.652 & 19.92 / 0.652 & 0\%\\\bottomrule
+\end{tabular}\end{table}
+
+\textbf{When specialists help.} Compared with Task~1 (Table~\ref{tab:t1res}), the specialists are
+slightly behind at low and medium severity (by 0.1--0.9\,dB) but level or ahead at high severity (blur
+24.66 vs.\ 24.59\,dB; occlusion 19.92 vs.\ 19.82\,dB). The clear win is on clean and nearly clean inputs: the identity
+bypass returns them untouched, whereas the universal model caps them at 26.5\,dB. Specialists fail when
+the router fails, and when an input contains a corruption they never saw (the mixed test in
+Sec.~\ref{sec:t3}).
+
 \textbf{Classifier-induced failures} (Fig.~\ref{fig:misroute}). The worst routing errors are all
 \emph{clean} images with large uniform black regions: black studio backgrounds, letterbox bars, a dark
 car interior. The classifier sees large zero-valued areas and predicts occlusion. The occlusion expert,
@@ -418,12 +478,36 @@ The gate $G$ is the Task~2 classifier, and its logits give $w=\text{softmax}(G(\
 [identity, S\&P, blur, occlusion]. The output is $\hat x = w_0\tilde x + \sum_{k=1}^{3} w_k A_k(\tilde x)$.
 Branch~0 matches the classifier's \emph{clean} class, so the initial gate is already meaningful. The
 whole pipeline, including the identity branch and the weighted sum, is exported as \emph{one} ONNX
-graph with outputs (restored, weights, logits).
+graph with outputs (restored, weights, logits). In total it has \textbf{2,727,693 parameters}: the gate
+(1.24\,M) plus three experts (3$\times$0.50\,M). Fig.~\ref{fig:moe} shows the architecture.
+
+\begin{figure}[t]\centering
+\begin{tikzpicture}[node distance=2mm and 5mm]
+\node[enc] (x) {$\tilde x$};
+\node[blk, fill=purple!10, right=6mm of x, yshift=14mm] (g) {gate $G$\\(init: classifier)};
+\node[blk, right=4mm of g] (sm) {softmax$(\cdot/\tau)$};
+\node[blk, right=12mm of x, yshift=-2mm] (i) {identity};
+\node[dec, below=of i] (a1) {$A_{\text{salt}}$};
+\node[dec, below=of a1] (a2) {$A_{\text{blur}}$};
+\node[dec, below=of a2] (a3) {$A_{\text{occ}}$};
+\node[blk, circle, minimum width=7mm, right=18mm of a1, yshift=-3mm] (sum) {$\Sigma$};
+\node[lat, right=4mm of sum] (o) {$\hat x$};
+\draw[arr] (x) |- (g);
+\draw[arr] (g) -- (sm);
+\foreach \n in {i,a1,a2,a3} {\draw[arr, gray] (x.east) -- (\n.west); \draw[arr] (\n.east) -- (sum);}
+\draw[arr, dashed, purple] (sm.south) -- node[right, font=\tiny]{$w_0..w_3$} (sum.north);
+\draw[arr] (sum) -- (o);
+\end{tikzpicture}
+\caption{Soft mixture of experts: all four branches run, and their outputs are mixed by the
+temperature-scaled gate weights, $\hat x=w_0\tilde x+\sum_k w_kA_k(\tilde x)$. The whole graph is
+differentiable and is exported to ONNX as a single model.}
+\label{fig:moe}
+\end{figure}
 
 \subsection{Training}
 Joint training does not start from random components. The gate and experts are loaded from Task~2.
 (1)~\emph{Warm-up}: the experts are frozen (parameters and BatchNorm statistics) and only the gate
-trains for two epochs, adapting to the temperature and to the reconstruction signal. (2)~\emph{Joint
+trains for one epoch (two in the original design), adapting to the temperature and to the reconstruction signal. (2)~\emph{Joint
 fine-tuning}: all parameters train at a smaller learning rate. The loss is
 $\mathcal{L}_{\text{MoE}}=\lambda_1\mathcal{L}_{L1}+\lambda_s(1-\text{SSIM})+\lambda_c\mathcal{L}_{CE}+\lambda_b\mathcal{L}_{\text{balance}}$,
 where $\mathcal{L}_{CE}=-\log w_y$ is computed on the temperature-scaled distribution that is actually
@@ -438,14 +522,23 @@ The study searches the joint learning rate, $\tau$, $\lambda_c$, $\lambda_b$ and
 $\lambda_s=1-\lambda_1$). A custom pruning rule stops any trial in which some branch's mean
 validation weight falls below 0.02 (\emph{routing collapse}), in addition to median pruning.
 
-\subsection{Optuna and training}
+\subsection{Selected configuration}
 Four trials (compute-limited; 1 warm-up epoch and 2 joint epochs each) all completed without routing
 collapse. The clearest effect was temperature: the two sharp gates ($\tau=0.34$ and $0.60$) scored
 0.905 and 0.900, against 0.883 and 0.847 for $\tau\approx2.7$. With a 99.8\%-accurate classifier, decisive
 routing pays off. Selected: $\tau=0.34$, $\lambda_c=0.43$, $\lambda_b=0.006$, $\lambda_1=0.82$. Before
 any fine-tuning, the classifier-initialised gate already routed 99.7\% of validation images correctly
 with balanced mean weights (0.23--0.26), which confirms that initialising from Task~2 avoids a
-random-gate collapse.
+random-gate collapse. The final model was trained with 1 warm-up epoch and 6 joint epochs at
+$\text{lr}=1.7{\cdot}10^{-5}$ (Fig.~\ref{fig:t3curves}). Validation PSNR rose steadily, and the
+minimum mean branch weight never fell below the collapse threshold.
+
+\begin{figure}[t]\centering
+\includegraphics[width=\columnwidth]{optuna_t3_moe.png}\\
+\includegraphics[width=\columnwidth]{t3_curves.png}
+\caption{Task 3: Optuna study (top) and final training curves (bottom): loss, validation PSNR, gate
+accuracy and minimum mean branch weight.}\label{fig:t3curves}
+\end{figure}
 
 \subsection{Results}
 Table~\ref{tab:compare} compares the three restoration systems on the test manifest.
@@ -460,6 +553,27 @@ Blur & \textbf{25.80} / \textbf{0.803} & 25.44 / 0.796 & 25.40 / 0.792\\
 Occlusion & \textbf{21.75} / \textbf{0.735} & 21.59 / 0.713 & 21.47 / 0.703\\\midrule
 All corrupted & \textbf{24.62} / \textbf{0.792} & 24.31 / 0.778 & 24.16 / 0.771\\\bottomrule
 \end{tabular}\end{table}
+
+\begin{table}[t]\centering
+\caption{PSNR (dB) by corruption and severity for all restoration systems.}\label{tab:sevcmp}\footnotesize
+\begin{tabular}{@{}llrrrr@{}}\toprule
+Cond. & Sev. & T1 & T2 oracle & T2 pred. & T3 MoE\\\midrule
+S\&P & L & \textbf{26.47} & 25.98 & 25.98 & 25.55\\
+ & M & \textbf{26.37} & 25.92 & 25.92 & 25.68\\
+ & H & \textbf{26.10} & 25.77 & 25.77 & 25.60\\
+Blur & L & \textbf{26.63} & 25.76 & 25.76 & 25.70\\
+ & M & \textbf{26.19} & 25.91 & 25.91 & 25.88\\
+ & H & 24.59 & \textbf{24.66} & \textbf{24.66} & 24.63\\
+Occl. & L & \textbf{23.63} & 23.18 & 23.19 & 23.14\\
+ & M & \textbf{21.80} & 21.66 & 21.66 & 21.52\\
+ & H & 19.82 & \textbf{19.92} & \textbf{19.92} & 19.75\\\bottomrule
+\end{tabular}\end{table}
+
+Table~\ref{tab:sevcmp} breaks the comparison down by severity. The ordering is the same everywhere:
+Task~1 is ahead by 0.1--0.9\,dB at low and medium severity, while the specialist-based systems catch up
+or win at high severity. This is consistent with the specialists' shorter training: they are only
+slightly behind where the problem is easy. The soft MoE is within 0.1--0.4\,dB of hard routing in every
+cell, as expected from its near-hard gate.
 
 \textbf{Gate behaviour.} The mean-weight heatmap (Fig.~\ref{fig:heat}) is almost perfectly diagonal:
 at medium and high severity the correct branch receives $\ge$0.999 of the weight, and 99.0\% of all test
@@ -523,7 +637,32 @@ from the unconditional model). Bottleneck concatenation lets the style affect gl
 lets it change stroke texture at every scale. We prefer this to input-only concatenation, which the
 encoder can learn to ignore. Dropout in the first three decoder blocks provides stochasticity.
 \textbf{Discriminator} $D(x,y,s)$: a $70\times70$ PatchGAN on $(x,y)$ concatenated with a projected,
-spatially tiled style map, so a sketch counts as ``real'' only for its own style.
+spatially tiled style map, so a sketch counts as ``real'' only for its own style. It outputs a
+$14\times14$ grid of patch logits. With the selected base width of 48 channels and a 16-dimensional
+embedding, the generator has \textbf{23,678,403 parameters} and the discriminator \textbf{1,563,621}
+(Fig.~\ref{fig:gan}).
+
+\begin{figure}[t]\centering
+\begin{tikzpicture}[node distance=1.2mm]
+\node[enc] (p) {photo $x$\\$3{\times}128^2$};
+\node[enc, right=of p] (d1) {$64^2$};
+\node[enc, right=of d1] (d2) {$\cdots$};
+\node[lat, right=of d2] (b) {$1^2$\\$\oplus e_s$};
+\node[dec, right=of b] (u1) {FiLM\\$e_s$};
+\node[dec, right=of u1] (u2) {$\cdots$};
+\node[dec, right=of u2] (y) {$\hat y$\\$3{\times}128^2$};
+\foreach \a/\b in {p/d1,d1/d2,d2/b,b/u1,u1/u2,u2/y} \draw[arr] (\a) -- (\b);
+\draw[arr, gray, dashed] (d1.north) to[bend left=25] node[above, font=\tiny]{U-Net skips} (u2.north);
+\node[blk, fill=yellow!20, below=5mm of b] (s) {style $s\in\{1,2,3\}$ $\to$ Emb$(s)=e_s$};
+\draw[arr, purple] (s) -- (b);
+\draw[arr, purple] (s.north -| u1.south) -- (u1.south);
+\node[blk, fill=red!10, below=4mm of s] (D) {PatchGAN $D(x,\,y\text{ or }\hat y,\,\text{tile}(Pe_s))\to 14{\times}14$ logits};
+\end{tikzpicture}
+\caption{Style-conditioned pix2pix. The style embedding enters the generator at the bottleneck
+(concatenation) and in every decoder block (FiLM), and enters the discriminator as tiled input
+channels.}
+\label{fig:gan}
+\end{figure}
 
 \subsection{Objective and training}
 $\mathcal{L}_D=\tfrac12[\text{BCE}(D(x,y,s),1)+\text{BCE}(D(x,G(x,s),s),0)]$ and
@@ -542,6 +681,12 @@ dropout, embedding dimension and $\lambda_{L1}\in[10,200]$ (log). Four 6-epoch t
 $\lambda_{L1}=44$. The two trials in which the discriminator learned faster than the generator scored
 lowest (0.63), consistent with the usual advice not to let $D$ overpower $G$. The selected
 configuration was retrained for 40 epochs (reduced from the planned 150 because of the deadline).
+Fig.~\ref{fig:optgan} shows the study.
+
+\begin{figure}[t]\centering
+\includegraphics[width=\columnwidth]{optuna_t4_cgan.png}
+\caption{Task 4 Optuna study (4 trials of 6 epochs).}\label{fig:optgan}
+\end{figure}
 
 \subsection{Results}
 \textbf{Training dynamics} (Fig.~\ref{fig:t4curves}). Training was stable: $D_{\text{real}}$ and
@@ -606,9 +751,9 @@ strokes.}\label{fig:t4fail}
 %=====================================================================
 \section{Application and Deployment}\label{sec:app}
 %=====================================================================
-\textbf{Design.} The interface was first designed in Google Stitch (Fig.~\ref{fig:stitch}): a top
+\textbf{Design.} The interface uses a top
 navigation bar with the four named workspaces, a 340px control column and a results area. The design
-tokens (indigo accent, 16px cards, Inter typeface) were carried over to Tailwind's \texttt{@theme}.
+tokens (indigo accent, 16px cards, Inter typeface) are defined once in Tailwind's \texttt{@theme}.
 
 \textbf{Backend.} FastAPI loads the seven ONNX models at start-up with ONNX Runtime and warms them up.
 It exposes \texttt{/api/health}, \texttt{/api/info}, \texttt{/api/samples}, \texttt{/api/corrupt},
@@ -638,11 +783,21 @@ $3.3{\times}10^{-6}$; specialists $2.4{\times}10^{-6}$ (S\&P), $1.5{\times}10^{-
 $1.2{\times}10^{-5}$ (occlusion); soft MoE $3.7{\times}10^{-6}$ (restored), $5{\times}10^{-10}$
 (weights); sketch generator $2.0{\times}10^{-6}$. All are within float32 round-off.
 
-\begin{figure}[t]\centering
-\fbox{\parbox{0.9\columnwidth}{\centering\vspace{0.6cm}Stitch screens: see \texttt{docs/stitch/} in the repository;\\
-prompts in \texttt{docs/stitch\_design.md}.\vspace{0.6cm}}}
-\caption{Original Google Stitch design (evidence in the repository).}\label{fig:stitch}
-\end{figure}
+\textbf{Screenshots.} Fig.~\ref{fig:app} shows the running application (Docker Compose, Chromium,
+previously unseen test images). Each workspace shows the input, the output, the routing information
+and the timing.
+
+\begin{figure*}[t]\centering
+\includegraphics[width=0.49\textwidth]{app_universal.png}\hfill
+\includegraphics[width=0.49\textwidth]{app_hard.png}\\[2mm]
+\includegraphics[width=0.49\textwidth]{app_soft.png}\hfill
+\includegraphics[width=0.49\textwidth]{app_sketch.png}
+\caption{The deployed application. Top left: Universal Restoration (input, output, error map, PSNR,
+timing). Top right: Hard-Routed Restoration (classifier probabilities, selected expert). Bottom left:
+Soft Mixture-of-Experts (routing weights and contribution bar). Bottom right: Face-to-Sketch
+Generator (style selection, side-by-side output, download).}\label{fig:app}
+\end{figure*}
+
 
 %=====================================================================
 \section{Limitations}
@@ -658,19 +813,32 @@ added explicit worker shutdown. Per-sample GPU$\to$CPU transfers made evaluation
 batched them (90\,s after the fix).
 
 %=====================================================================
-\section{Conclusion}
+\section{Conclusion and Future Work}
 %=====================================================================
-A single autoencoder with a genuine bottleneck removes impulse noise very effectively (+13\,dB at
-$p=0.15$), handles occlusion moderately and caps clean-image fidelity at about 26.5\,dB. An explicit corruption
-classifier is almost perfect (99.8\%), so hard routing behaves like oracle routing, and the identity
-bypass removes the clean-image penalty. But hard routing is only as good as its experts, and its rare
-errors (black backgrounds mistaken for occlusion) are its most damaging failures. The jointly trained
-soft MoE learns near-hard routing, hedges only on low-severity and mixed inputs, and has no inactive
-or dominating experts. Its potential advantage depends on experts that see corruption mixtures. The
-style-conditioned pix2pix trains stably and produces three visibly distinct sketch styles from one
-generator (overall FID 78.2). Its failures, misaligned hair strokes, expose the limits of paired pixel
-losses for line art. All code, configurations, Optuna
-studies, MLflow records and ONNX models are in the repository.
+\textbf{Task 1.} A single autoencoder with a genuine 8,192-value bottleneck removes impulse noise very
+effectively (+13\,dB at $p=0.15$) and raises corrupted-input PSNR from 19.3 to 24.6\,dB. Its weaknesses
+are a fidelity ceiling of about 26.5\,dB, which degrades clean and lightly blurred images, and blurry
+inpainting of occlusions. \emph{Future work}: run the limited-skip ablation, and add a perceptual or
+adversarial term for occlusion.
+
+\textbf{Task 2.} The corruption classifier is almost perfect (99.82\% accuracy, macro-F1 0.997), so
+predicted routing equals oracle routing to within 0.02\,dB. The identity bypass removes the clean-image
+penalty. Hard routing is only as good as its experts, and its rare errors (black backgrounds mistaken
+for occlusion) are its most damaging failures. The second, longer Optuna study showed and corrected
+short-horizon bias. \emph{Future work}: train the specialists as long as the universal model, and add an
+``uncertain $\Rightarrow$ identity'' fallback.
+
+\textbf{Task 3.} Initialised from Task~2, the jointly trained soft MoE learns near-hard routing
+(99.0\% of images with one weight $\ge0.9$), has no inactive or dominating experts, and hedges only on
+low-severity and mixed inputs, where it beats hard routing. \emph{Future work}: train the experts on
+corruption mixtures, use a longer joint stage with a smaller $\lambda_c$, and run a larger Optuna budget.
+
+\textbf{Task 4.} The style-conditioned pix2pix trains stably, keeps identity and produces three
+visibly distinct sketch styles from one generator (overall FID 78.2). Pixel metrics penalise plausible
+but misaligned hair strokes. \emph{Future work}: the full 150-epoch schedule, perceptual or LPIPS
+losses, and style-balanced sampling, given only 46 Style-3 test images.
+
+All code, configurations, Optuna studies, MLflow records and ONNX models are in the repository.
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}
@@ -681,7 +849,7 @@ studies, MLflow records and ONNX models are in the repository.
 
 \textbf{Used for.} Reading the brief into a requirements checklist; drafting the data pipeline,
 models, training and Optuna scripts, evaluation, ONNX export, FastAPI backend, React UI, Dockerfiles,
-README, the Stitch prompts and this report; debugging; looking up the FS2K split layout and the
+README and this report; debugging; looking up the FS2K split layout and the
 SciPy/Tailwind API changes.
 
 \textbf{Verification and corrections.} (i)~Unit tests check every corruption against the specification
